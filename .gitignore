@@ -1,0 +1,3 @@
+*.bak.*
+# Несвободные обои (Монако-2024) — не публиковать.
+config/omarchy/themes/ferrari/backgrounds/1[1-4]-*

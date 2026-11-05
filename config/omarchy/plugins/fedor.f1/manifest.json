@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "fedor.f1",
+  "name": "F1",
+  "version": "1.0.0",
+  "author": "fedor",
+  "description": "Countdown to the next Formula 1 race with schedule, standings and last result",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "F1",
+    "description": "Countdown to the next Formula 1 race with schedule, standings and last result",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {
+      "driver": "leclerc"
+    },
+    "schema": [
+      {
+        "key": "driver",
+        "type": "string",
+        "label": "Highlighted driver (Ergast driver id)",
+        "defaultValue": "leclerc"
+      }
+    ]
+  }
+}

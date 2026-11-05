@@ -1,0 +1,20 @@
+[font]
+base-size = 10
+
+# Glass: translucent surfaces, blurred by Hyprland (see hypr/looknfeel.lua).
+[bar]
+background-alpha = 0.55
+# Taller strip so the rounded islands have room above and below.
+size-horizontal = 32
+
+[popups]
+background-alpha = 0.72
+
+[notifications]
+background-alpha = 0.72
+
+[menu]
+background-alpha = 0.72
+
+[launcher]
+background-alpha = 0.7

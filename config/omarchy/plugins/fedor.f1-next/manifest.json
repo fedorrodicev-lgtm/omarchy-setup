@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "fedor.f1-next",
+  "name": "F1 Next Race",
+  "version": "1.0.0",
+  "author": "fedor",
+  "description": "Desktop card with the next Grand Prix circuit, countdown and track weather",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

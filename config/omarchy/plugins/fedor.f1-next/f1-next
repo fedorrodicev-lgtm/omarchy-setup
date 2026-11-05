@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+# Prints one JSON blob for the next-race desktop card: the upcoming Grand
+# Prix with its qualifying and race times, the circuit outline, and the
+# weather forecast at the track for both sessions. Sources are Jolpica for
+# the calendar, OpenF1 + MultiViewer for the outline and Open-Meteo for the
+# forecast. Cached for an hour; on network trouble the cache is served.
+
+import json
+import math
+import os
+import sys
+import time
+import urllib.request
+from datetime import datetime, timedelta, timezone
+
+JOLPICA = "https://api.jolpi.ca/ergast/f1"
+OPENF1 = "https://api.openf1.org/v1"
+MULTIVIEWER = "https://api.multiviewer.app/api/v1"
+OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
+CACHE = os.path.expanduser("~/.cache/omarchy/f1-next.json")
+CACHE_SECONDS = 60 * 60
+SCALE = 1000
+
+
+def get(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "omarchy-f1-next/1.0"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.load(resp)
+
+
+def parse_time(stamp):
+    return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+
+def utc(day, clock):
+    return f"{day}T{clock or '00:00:00Z'}"
+
+
+def upcoming_race(now):
+    # Stays on a race until three hours after lights out.
+    for season in ("current", str(now.year + 1)):
+        races = get(f"{JOLPICA}/{season}.json?limit=40")["MRData"]["RaceTable"]["Races"]
+        for race in races:
+            if parse_time(utc(race["date"], race.get("time"))) + timedelta(hours=3) > now:
+                return race
+    return None
+
+
+def outline(race_start):
+    # OpenF1 knows the circuit key MultiViewer's outlines are filed under.
+    sessions = get(f"{OPENF1}/sessions?year={race_start.year}&session_name=Race")
+    match = next((s for s in sessions if s["date_start"][:10] == race_start.date().isoformat()), None)
+    if not match:
+        return None
+    circuit = get(f"{MULTIVIEWER}/circuits/{match['circuit_key']}/{race_start.year}")
+    xs, ys = circuit["x"], circuit["y"]
+    rot = math.radians(circuit.get("rotation", 0))
+    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    # Rotated the way the circuit is usually drawn, y flipped to grow downwards.
+    pts = [((x - cx) * math.cos(rot) - (y - cy) * math.sin(rot),
+            -((x - cx) * math.sin(rot) + (y - cy) * math.cos(rot))) for x, y in zip(xs, ys)]
+    minx = min(p[0] for p in pts)
+    miny = min(p[1] for p in pts)
+    width = max(p[0] for p in pts) - minx
+    height = max(p[1] for p in pts) - miny
+    span = max(width, height) or 1
+    return {
+        "track": [round(v) for x, y in pts for v in ((x - minx) / span * SCALE, (y - miny) / span * SCALE)],
+        "width": round(width / span * SCALE),
+        "height": round(height / span * SCALE),
+    }
+
+
+def forecast(lat, lon, moments):
+    # Open-Meteo forecasts about two weeks out; further sessions get nothing.
+    days = sorted({m.date().isoformat() for m in moments})
+    url = (f"{OPEN_METEO}?latitude={lat}&longitude={lon}"
+           "&hourly=temperature_2m,precipitation_probability,weather_code"
+           f"&start_date={days[0]}&end_date={days[-1]}&timezone=UTC")
+    try:
+        hourly = get(url)["hourly"]
+    except Exception:
+        return [None] * len(moments)
+    out = []
+    for m in moments:
+        key = m.replace(minute=0, second=0).strftime("%Y-%m-%dT%H:00")
+        if key not in hourly["time"]:
+            out.append(None)
+            continue
+        i = hourly["time"].index(key)
+        out.append({
+            "temp": hourly["temperature_2m"][i],
+            "rain": hourly["precipitation_probability"][i],
+            "code": hourly["weather_code"][i],
+        })
+    return out
+
+
+def fetch():
+    now = datetime.now(timezone.utc)
+    race = upcoming_race(now)
+    if not race:
+        return {"fetchedAt": int(time.time()), "race": None}
+    loc = race["Circuit"]["Location"]
+    start = parse_time(utc(race["date"], race.get("time")))
+    sessions = []
+    if "Qualifying" in race:
+        sessions.append(("Quali", parse_time(utc(race["Qualifying"]["date"], race["Qualifying"].get("time")))))
+    sessions.append(("Race", start))
+    weather = forecast(loc["lat"], loc["long"], [t for _, t in sessions])
+    data = {
+        "fetchedAt": int(time.time()),
+        "race": {
+            "name": race["raceName"],
+            "round": race["round"],
+            "country": loc["country"],
+            "locality": loc["locality"],
+            "circuit": race["Circuit"]["circuitName"],
+            "start": start.isoformat().replace("+00:00", "Z"),
+            "sessions": [
+                {"name": name, "start": t.isoformat().replace("+00:00", "Z"), "weather": w}
+                for (name, t), w in zip(sessions, weather)
+            ],
+        },
+    }
+    try:
+        data["race"].update(outline(start) or {})
+    except Exception:
+        pass
+    return data
+
+
+def read_cache():
+    try:
+        with open(CACHE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def main():
+    cached = read_cache()
+    fresh = cached and time.time() - cached.get("fetchedAt", 0) < CACHE_SECONDS
+    if fresh and cached.get("race"):
+        # The cached race is stale once it is over, however young the cache.
+        fresh = parse_time(cached["race"]["start"]) + timedelta(hours=3) > datetime.now(timezone.utc)
+    if fresh and "--refresh" not in sys.argv:
+        print(json.dumps(cached))
+        return
+    try:
+        data = fetch()
+    except Exception as e:
+        if cached:
+            print(json.dumps(cached))
+            return
+        print(json.dumps({"error": str(e)}))
+        sys.exit(1)
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    tmp = CACHE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, separators=(",", ":"))
+    os.replace(tmp, CACHE)
+    print(json.dumps(data))
+
+
+if __name__ == "__main__":
+    main()
