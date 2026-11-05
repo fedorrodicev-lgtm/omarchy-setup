@@ -2,7 +2,11 @@
 
 Мой сетап поверх [Omarchy](https://omarchy.org/) (Arch + Hyprland): тема Ferrari, стекло с размытием, скруглённые окна, бар из трёх «островков» и F1-виджеты.
 
-<!-- ![screenshot](screenshot.png) -->
+![Рабочий стол: бар из трёх островков и карточка следующего Гран-при](screenshots/desktop.jpg)
+
+| Стекло и скругления | F1 в баре |
+|---|---|
+| ![Полупрозрачные терминалы foot с размытием: fastfetch и looknfeel.lua](screenshots/terminal.jpg) | ![Панель F1: расписание уикенда, личный зачёт и последняя гонка](screenshots/f1-panel.jpg) |
 
 ## Что внутри
 
