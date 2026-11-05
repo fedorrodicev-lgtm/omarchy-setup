@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "fedor.music",
+  "name": "Music",
+  "version": "1.0.0",
+  "author": "fedor",
+  "description": "Now playing in the bar with a race-style lap line, and a panel with cover art, seek and controls",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Music",
+    "description": "Now playing in the bar with a race-style lap line, and a panel with cover art, seek and controls",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {
+      "maxChars": 32
+    },
+    "schema": [
+      {
+        "key": "maxChars",
+        "type": "number",
+        "label": "Longest bar label, in characters",
+        "defaultValue": 32
+      }
+    ]
+  }
+}

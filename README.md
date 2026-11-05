@@ -2,11 +2,11 @@
 
 Мой сетап поверх [Omarchy](https://omarchy.org/) (Arch + Hyprland): тема Ferrari, стекло с размытием, скруглённые окна, бар из трёх «островков» и F1-виджеты.
 
-![Рабочий стол: бар из трёх островков и карточка следующего Гран-при](screenshots/desktop.jpg)
+![Рабочий стол: бар из трёх островков, трек в центре и карточка следующего Гран-при](screenshots/desktop.jpg)
 
-| Стекло и скругления | F1 в баре |
-|---|---|
-| ![Полупрозрачные терминалы foot с размытием: fastfetch и looknfeel.lua](screenshots/terminal.jpg) | ![Панель F1: расписание уикенда, личный зачёт и последняя гонка](screenshots/f1-panel.jpg) |
+| Стекло и скругления | F1 в баре | Музыка в баре |
+|---|---|---|
+| ![Полупрозрачные терминалы foot с размытием: fastfetch и looknfeel.lua](screenshots/terminal.jpg) | ![Панель F1: расписание уикенда, личный зачёт и последняя гонка](screenshots/f1-panel.jpg) | ![Панель музыки: обложка, перемотка и управление](screenshots/music-panel.jpg) |
 
 ## Что внутри
 
@@ -21,6 +21,7 @@
 | **Индикаторы** с анимированным появлением | `config/omarchy/plugins/fedor.indicators` |
 | **F1 в баре**: отсчёт до гонки, расписание, личный зачёт, последний результат ([Jolpica](https://github.com/jolpica/jolpica-f1)) | `config/omarchy/plugins/fedor.f1` |
 | **F1 на рабочем столе**: карточка следующего Гран-при со схемой трассы и прогнозом погоды ([OpenF1](https://openf1.org), [MultiViewer](https://multiviewer.app), [Open-Meteo](https://open-meteo.com)) | `config/omarchy/plugins/fedor.f1-next` |
+| **Музыка в баре**: текущий трек справа от часов с красной полоской прогресса; по клику открывается панель с обложкой, перемоткой и кнопками. Работает с любым MPRIS-плеером | `config/omarchy/plugins/fedor.music` |
 | **Бинды и раскладка**: `Super+Shift+S` скриншот, `Super+Shift+R` запись экрана, `Super+V` float/tile, us/ru по `Alt+Shift` | `config/hypr/bindings.lua`, `config/hypr/input.lua` |
 
 ## Установка

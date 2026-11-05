@@ -1,6 +1,6 @@
 {
   "bar": {
-    "centerAnchor": "omarchy.clock",
+    "centerAnchor": "",
     "id": "fedor.bar",
     "layout": {
       "center": [
@@ -15,6 +15,9 @@
           "formatAlt": "d MMMM 'W'ww yyyy",
           "id": "omarchy.clock",
           "verticalFormat": "HH\n—\nmm"
+        },
+        {
+          "id": "fedor.music"
         },
         {
           "id": "omarchy.keyboard-layout"

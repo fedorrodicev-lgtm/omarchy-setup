@@ -21,6 +21,7 @@ DIRS=(
   omarchy/plugins/fedor.indicators
   omarchy/plugins/fedor.f1
   omarchy/plugins/fedor.f1-next
+  omarchy/plugins/fedor.music
 )
 # Обои Монако-2024 (11–14) без свободной лицензии — только для личного пользования.
 EXCLUDE=(--exclude='*.bak.*' --exclude='backgrounds/1[1-4]-*')
