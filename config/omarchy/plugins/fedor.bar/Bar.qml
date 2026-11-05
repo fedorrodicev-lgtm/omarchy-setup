@@ -327,10 +327,16 @@ Item {
     pluginBarApis = next
   }
 
-  onActivePopoutChanged: schedulePluginBarApiSync()
+  onActivePopoutChanged: {
+    schedulePluginBarApiSync()
+    if (activePopout) Qt.callLater(root.peelOpenPanels)
+  }
   onClickTargetsChanged: schedulePluginBarApiSync()
   onLayoutConfigChanged: schedulePluginBarApiSync()
-  onModuleSlotsChanged: Qt.callLater(prunePluginBarApis)
+  onModuleSlotsChanged: {
+    Qt.callLater(prunePluginBarApis)
+    Qt.callLater(root.peelOpenPanels)
+  }
 
   Component.onDestruction: {
     for (var id in pluginBarApis) {
@@ -564,6 +570,63 @@ Item {
 
   function releasePopout(owner) {
     if (activePopout === owner) activePopout = null
+  }
+
+  // --- peel-out panels ------------------------------------------------------
+
+  // Every dropdown opens through requestPopout, so that is where the bar finds
+  // the panel window that just opened and hangs a PeelFx on its card. After
+  // that the PeelFx follows the window's own open/close by itself.
+  property var peelFxs: []
+
+  Component {
+    id: peelFxComponent
+    PeelFx {}
+  }
+
+  function isKeyboardPanel(obj) {
+    return !!obj && obj.cardOrigin !== undefined && obj.anchorItem !== undefined && obj.open !== undefined
+  }
+
+  function collectKeyboardPanels(obj, depth, out) {
+    if (!obj || depth > 10) return
+    if (isKeyboardPanel(obj)) {
+      out.push(obj)
+      return
+    }
+    var data = obj.data
+    if (!data) return
+    for (var i = 0; i < data.length; i++) collectKeyboardPanels(data[i], depth + 1, out)
+  }
+
+  function panelCard(win) {
+    // The window's default property holds the dismiss area, the twin
+    // Variants and the card; the card is the BorderSurface.
+    var kids = win.data || []
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i] && kids[i].contentTopInset !== undefined) return kids[i]
+    }
+    return null
+  }
+
+  function peelOpenPanels() {
+    var live = peelFxs.filter(function(fx) { return fx && fx.win && fx.card })
+    var panels = []
+    for (var i = 0; i < moduleSlots.length; i++) {
+      var slot = moduleSlots[i]
+      if (slot && slot.activeItem) collectKeyboardPanels(slot.activeItem, 0, panels)
+    }
+    for (var j = 0; j < panels.length; j++) {
+      var win = panels[j]
+      if (live.some(function(fx) { return fx.win === win })) continue
+      var card = panelCard(win)
+      if (!card) continue
+      var fx = peelFxComponent.createObject(root, { win: win, card: card })
+      fx.attach()
+      live.push(fx)
+      if (win.open) fx.playOpen()
+    }
+    peelFxs = live
   }
 
   readonly property bool vertical: position === "left" || position === "right"
