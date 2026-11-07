@@ -5,7 +5,10 @@
 # left), with a thin hairline outline and a soft drop shadow on an even
 # transparent margin.
 #
-#   screenshot-window-mac            pick a window (Tab / arrows / click)
+#   screenshot-window-mac            smart picker, like Super+Shift+S: a click
+#                                    on a window (or Tab / arrows) gives the
+#                                    styled shot, a dragged region stays plain
+#   screenshot-window-mac windows    windows-only picker, always styled
 #   screenshot-window-mac active     capture the focused window
 #
 # Env: MAC_SHOT_SHADOW=0 disables the shadow, MAC_SHOT_OUTLINE=<color>
@@ -32,16 +35,61 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ ${1:-} == active ]]; then
-  SELECTION=$(hyprctl activewindow -j | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
-else
-  { read -r FREEZE_PID; read -r SELECTION; } < <(omarchy-capture-region windows --keep-freeze)
-fi
-[[ $SELECTION =~ ^-?[0-9]+,-?[0-9]+\ [0-9]+x[0-9]+$ ]] || exit 0
+MODE="${1:-smart}"
 
-grim -g "$SELECTION" "$TMP/shot.png" || exit 1
+# Same window rectangles the Omarchy picker offers on the active workspace.
+window_rects() {
+  local ws
+  ws=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .activeWorkspace.id')
+  hyprctl clients -j | jq -r --argjson ws "$ws" \
+    '.[] | select(.workspace.id == $ws and .hidden != true) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'
+}
+
+notify() {
+  wl-copy --type image/png <"$1"
+  omarchy-notification-send "Screenshot saved to clipboard and file" "$(basename "$1")" \
+    --image "$1" --exec "${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}" "$1" || true
+}
+
+# Software-composited cursors get baked into grim frames; force hardware
+# cursors while capturing, as omarchy-capture-screenshot does.
+NO_HW_CURSORS=$(hyprctl getoption cursor:no_hardware_cursors -j | jq '.int')
+set_no_hw_cursors() {
+  hyprctl eval "hl.config({ cursor = { no_hardware_cursors = $1 } })" &>/dev/null ||
+    hyprctl keyword cursor:no_hardware_cursors "$1" &>/dev/null
+}
+set_no_hw_cursors 0
+restore_cursor() { set_no_hw_cursors "$NO_HW_CURSORS"; }
+
+case $MODE in
+active)
+  SELECTION=$(hyprctl activewindow -j | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
+  ;;
+windows | smart)
+  { read -r FREEZE_PID; read -r SELECTION; } < <(omarchy-capture-region "$MODE" --keep-freeze)
+  ;;
+*)
+  echo "usage: $(basename "$0") [smart|windows|active]" >&2
+  exit 1
+  ;;
+esac
+[[ $SELECTION =~ ^-?[0-9]+,-?[0-9]+\ [0-9]+x[0-9]+$ ]] || { restore_cursor; exit 0; }
+
+grim -g "$SELECTION" "$TMP/shot.png" || { restore_cursor; exit 1; }
+restore_cursor
 [[ -n $FREEZE_PID ]] && kill "$FREEZE_PID" 2>/dev/null
 FREEZE_PID=""
+
+FILEPATH="$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
+
+# In smart mode only a whole window gets the macOS treatment; a dragged region
+# or a whole monitor is saved as is.
+if [[ $MODE == smart ]] && ! window_rects | grep -qxF "$SELECTION"; then
+  cp "$TMP/shot.png" "$FILEPATH"
+  echo "$FILEPATH"
+  notify "$FILEPATH"
+  exit 0
+fi
 
 # Corner radius in physical pixels: Hyprland rounding x monitor scale.
 SCALE=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .scale')
@@ -83,8 +131,6 @@ if [[ $OUTLINE != none ]]; then
   magick "$TMP/window.png" "$TMP/outline.png" -compose Over -composite "$TMP/window.png"
 fi
 
-FILEPATH="$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
-
 if [[ $SHADOW != 0 ]]; then
   # Same margin on every side; the shadow drops slightly but stays inside it.
   PAD=$(awk -v s="$SCALE" 'BEGIN { printf "%d", 18 * s }')
@@ -102,6 +148,4 @@ else
 fi
 
 echo "$FILEPATH"
-wl-copy --type image/png <"$FILEPATH"
-omarchy-notification-send "Screenshot saved to clipboard and file" "$(basename "$FILEPATH")" \
-  --image "$FILEPATH" --exec "${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}" "$FILEPATH" || true
+notify "$FILEPATH"

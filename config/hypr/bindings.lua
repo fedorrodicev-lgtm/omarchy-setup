@@ -28,12 +28,14 @@
 -- o.bind("SUPER + H", nil, "voxtype record toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
--- Screenshot (unbind Google Maps and bind to interactive screenshot capture)
+-- Screenshot (unbind Google Maps and bind to interactive screenshot capture).
+-- Clicking a window gives a macOS-style shot (transparent rounded corners,
+-- hairline, shadow); a dragged region is saved as is.
+-- Avoid Alt+Shift combos here: they switch the us/ru layout, so the key no
+-- longer matches.
 hl.unbind("SUPER + SHIFT + S")
-o.bind("SUPER + SHIFT + S", "Screenshot", "omarchy-capture-screenshot")
-
--- macOS-style window screenshot: transparent rounded corners, hairline, shadow
-o.bind("SUPER + SHIFT + ALT + S", "Window screenshot (macOS style)", "~/.local/bin/screenshot-window-mac")
+o.bind("SUPER + SHIFT + S", "Screenshot", "~/.local/bin/screenshot-window-mac")
+o.bind("SUPER + CTRL + SHIFT + S", "Window screenshot (macOS style)", "~/.local/bin/screenshot-window-mac windows")
 o.bind("SHIFT + PRINT", "Active window screenshot (macOS style)", "~/.local/bin/screenshot-window-mac active")
 
 -- Screen recording (stop if active, or open capture menu if idle)
