@@ -32,6 +32,10 @@
 hl.unbind("SUPER + SHIFT + S")
 o.bind("SUPER + SHIFT + S", "Screenshot", "omarchy-capture-screenshot")
 
+-- macOS-style window screenshot: transparent rounded corners, hairline, shadow
+o.bind("SUPER + SHIFT + ALT + S", "Window screenshot (macOS style)", "~/.local/bin/screenshot-window-mac")
+o.bind("SHIFT + PRINT", "Active window screenshot (macOS style)", "~/.local/bin/screenshot-window-mac active")
+
 -- Screen recording (stop if active, or open capture menu if idle)
 o.bind("SUPER + SHIFT + R", "Screenrecording", "omarchy-capture-screenrecording --stop-recording || omarchy-menu toggle trigger.capture.screenrecord")
 

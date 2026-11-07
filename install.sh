@@ -1,6 +1,7 @@
 #!/bin/bash
-# Ставит сетап поверх Omarchy: копирует config/ в ~/.config, заменённые файлы
-# сохраняет в ~/.config/dotfiles-backup-<время>, затем применяет тему.
+# Ставит сетап поверх Omarchy: копирует config/ в ~/.config и bin/ в ~/.local/bin,
+# заменённые файлы сохраняет в ~/.config/dotfiles-backup-<время>, затем
+# применяет тему.
 
 set -euo pipefail
 REPO="$(dirname "$(readlink -f "$0")")"
@@ -15,6 +16,14 @@ while IFS= read -r -d '' f; do
   fi
   install -D -m "$(stat -c %a "$f")" "$f" "$DST/$f"
 done < <(find . -type f -print0)
+
+for b in "$REPO"/bin/*; do
+  dst="$HOME/.local/bin/$(basename "$b")"
+  if [[ -e $dst ]] && ! cmp -s "$b" "$dst"; then
+    install -Dm755 "$dst" "$BACKUP/local-bin/$(basename "$b")"
+  fi
+  install -Dm755 "$b" "$dst"
+done
 
 [[ -d $BACKUP ]] && echo "Старые файлы сохранены в $BACKUP"
 

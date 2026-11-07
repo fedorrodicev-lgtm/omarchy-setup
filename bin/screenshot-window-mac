@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# macOS-style window screenshot: the window's rounded corners become
+# transparent (cut just inside the Hyprland rounding, so no border fringe is
+# left), with a thin hairline outline and a soft drop shadow on an even
+# transparent margin.
+#
+#   screenshot-window-mac            pick a window (Tab / arrows / click)
+#   screenshot-window-mac active     capture the focused window
+#
+# Env: MAC_SHOT_SHADOW=0 disables the shadow, MAC_SHOT_OUTLINE=<color>
+# and MAC_SHOT_OUTLINE_OPACITY=<0..1> change the hairline (default: white at
+# 0.22, MAC_SHOT_OUTLINE=none to disable).
+
+set -o pipefail
+
+[[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
+OUTPUT_DIR="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
+mkdir -p "$OUTPUT_DIR"
+
+SHADOW="${MAC_SHOT_SHADOW:-1}"
+OUTLINE="${MAC_SHOT_OUTLINE:-white}"
+OUTLINE_OPACITY="${MAC_SHOT_OUTLINE_OPACITY:-0.22}"
+
+pkill slurp && exit 0
+
+TMP=$(mktemp -d)
+FREEZE_PID=""
+cleanup() {
+  [[ -n $FREEZE_PID ]] && kill "$FREEZE_PID" 2>/dev/null
+  rm -rf "$TMP"
+}
+trap cleanup EXIT
+
+if [[ ${1:-} == active ]]; then
+  SELECTION=$(hyprctl activewindow -j | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
+else
+  { read -r FREEZE_PID; read -r SELECTION; } < <(omarchy-capture-region windows --keep-freeze)
+fi
+[[ $SELECTION =~ ^-?[0-9]+,-?[0-9]+\ [0-9]+x[0-9]+$ ]] || exit 0
+
+grim -g "$SELECTION" "$TMP/shot.png" || exit 1
+[[ -n $FREEZE_PID ]] && kill "$FREEZE_PID" 2>/dev/null
+FREEZE_PID=""
+
+# Corner radius in physical pixels: Hyprland rounding x monitor scale.
+SCALE=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .scale')
+ROUNDING=$(hyprctl getoption decoration:rounding -j | jq '.int')
+read -r W H < <(magick identify -format '%w %h' "$TMP/shot.png")
+
+# Measured against real captures: with a border, the window content's corner
+# is close to a circle (~3px past rounding x scale), whatever rounding_power
+# says. Cutting a hair inside it leaves no border/wallpaper fringe.
+R=$(awk -v r="$ROUNDING" -v s="$SCALE" 'BEGIN { printf "%d", r * s + 3.5 }')
+POWER="${MAC_SHOT_CORNER_POWER:-2}"
+
+if ((R > 1)); then
+  # Top-left corner tile of the superellipse |x|^p + |y|^p <= 1, rendered at
+  # 4x and downscaled for antialiasing.
+  SS=$((R * 4))
+  magick -size "${SS}x${SS}" xc:black -fx \
+    "dx = max(1 - (i + 0.5) / w, 0); dy = max(1 - (j + 0.5) / h, 0); pow(dx, $POWER) + pow(dy, $POWER) <= 1 ? 1 : 0" \
+    -resize "${R}x${R}" "$TMP/corner.png"
+
+  magick -size "${W}x${H}" xc:white \
+    "$TMP/corner.png" -geometry +0+0 -composite \
+    \( "$TMP/corner.png" -flop \) -geometry "+$((W - R))+0" -composite \
+    \( "$TMP/corner.png" -flip \) -geometry "+0+$((H - R))" -composite \
+    \( "$TMP/corner.png" -flip -flop \) -geometry "+$((W - R))+$((H - R))" -composite \
+    "$TMP/mask.png"
+else
+  magick -size "${W}x${H}" xc:white "$TMP/mask.png"
+fi
+
+magick "$TMP/shot.png" "$TMP/mask.png" -alpha off -compose CopyOpacity -composite "$TMP/window.png"
+
+# Hairline: a ~1px ring along the inside of the mask, painted over the window.
+if [[ $OUTLINE != none ]]; then
+  magick "$TMP/mask.png" \( +clone -morphology Erode Disk:1 \) \
+    -compose MinusSrc -composite -alpha off \
+    -background "$OUTLINE" -alpha shape \
+    -channel A -evaluate multiply "$OUTLINE_OPACITY" +channel "$TMP/outline.png"
+  magick "$TMP/window.png" "$TMP/outline.png" -compose Over -composite "$TMP/window.png"
+fi
+
+FILEPATH="$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
+
+if [[ $SHADOW != 0 ]]; then
+  # Same margin on every side; the shadow drops slightly but stays inside it.
+  PAD=$(awk -v s="$SCALE" 'BEGIN { printf "%d", 18 * s }')
+  SIGMA=$(awk -v s="$SCALE" 'BEGIN { printf "%.1f", 6 * s }')
+  DROP=$(awk -v s="$SCALE" 'BEGIN { printf "%d", 3 * s }')
+  magick -size "$((W + 2 * PAD))x$((H + 2 * PAD))" xc:none \
+    \( "$TMP/window.png" -alpha extract -background black -alpha shape \
+       -channel A -evaluate multiply 0.45 +channel \
+       -bordercolor none -border "$PAD" -blur "0x$SIGMA" \) \
+    -geometry "+0+$DROP" -compose Over -composite \
+    "$TMP/window.png" -geometry "+$PAD+$PAD" -compose Over -composite \
+    -depth 8 "$FILEPATH" || exit 1
+else
+  cp "$TMP/window.png" "$FILEPATH"
+fi
+
+echo "$FILEPATH"
+wl-copy --type image/png <"$FILEPATH"
+omarchy-notification-send "Screenshot saved to clipboard and file" "$(basename "$FILEPATH")" \
+  --image "$FILEPATH" --exec "${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}" "$FILEPATH" || true

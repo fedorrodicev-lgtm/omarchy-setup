@@ -24,6 +24,10 @@ DIRS=(
   omarchy/plugins/fedor.music
   omarchy/plugins/fedor.network
 )
+# Скрипты из ~/.local/bin — попадают в bin/.
+BINS=(
+  screenshot-window-mac
+)
 # Обои Монако-2024 (11–14) без свободной лицензии — только для личного пользования.
 EXCLUDE=(--exclude='*.bak.*' --exclude='backgrounds/1[1-4]-*')
 
@@ -33,6 +37,9 @@ done
 for d in "${DIRS[@]}"; do
   mkdir -p "$REPO/config/$d"
   rsync -a --delete "${EXCLUDE[@]}" "$SRC/$d/" "$REPO/config/$d/"
+done
+for b in "${BINS[@]}"; do
+  install -Dm755 "$HOME/.local/bin/$b" "$REPO/bin/$b"
 done
 
 # EXIF/XMP фотографов (имена, почты, адреса, серийники камер) не публикуем —
