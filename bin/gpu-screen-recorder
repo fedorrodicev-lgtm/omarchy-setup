@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Shim in front of /usr/bin/gpu-screen-recorder. When the capture region
+# (-w WxH+X+Y) is exactly a window, every window with that geometry, on any
+# workspace, is tagged "recording" while the capture runs. That drops their
+# rounded corners (rule in ~/.config/hypr/looknfeel.lua), so the video has no
+# wallpaper or border in the corners, even when switching workspaces with
+# windows tiled at the same spot. Hyprland events keep the tags in sync as
+# windows open, move or change workspaces. Anything else passes through.
+#
+# The real recorder runs as a child with argv0 "gpu-screen-recorder" so that
+# Omarchy's `pgrep/pkill -f ^gpu-screen-recorder` still finds and stops it.
+
+REAL=/usr/bin/gpu-screen-recorder
+TAG=recording
+
+region=""
+args=("$@")
+for ((i = 0; i < ${#args[@]} - 1; i++)); do
+  [[ ${args[i]} == -w ]] && region=${args[i + 1]}
+done
+
+[[ $region =~ ^([0-9]+)x([0-9]+)\+(-?[0-9]+)\+(-?[0-9]+)$ ]] || exec -a gpu-screen-recorder "$REAL" "$@"
+W=${BASH_REMATCH[1]} H=${BASH_REMATCH[2]} X=${BASH_REMATCH[3]} Y=${BASH_REMATCH[4]}
+
+# "+addr" for windows to tag, "-addr" for tagged windows that no longer match.
+# With "clear" every tagged window is untagged.
+tag_changes() {
+  hyprctl clients -j | jq -r --arg tag "$TAG" --arg clear "${1:-}" \
+    --argjson w "$W" --argjson h "$H" --argjson x "$X" --argjson y "$Y" '
+    .[] |
+    (.at == [$x, $y] and .size == [$w, $h] and $clear == "") as $match |
+    (.tags | index($tag) != null) as $tagged |
+    if $match and ($tagged | not) then "+\(.address)"
+    elif $tagged and ($match | not) then "-\(.address)"
+    else empty end'
+}
+
+sync_tags() {
+  local change
+  while IFS= read -r change; do
+    hyprctl dispatch "hl.dsp.window.tag({ window = \"address:${change:1}\", tag = \"${change:0:1}$TAG\" })" >/dev/null 2>&1 ||
+      hyprctl dispatch tagwindow "${change:0:1}$TAG" "address:${change:1}" >/dev/null 2>&1
+  done < <(tag_changes "$@")
+}
+
+# Only worth doing when the region really is a window.
+[[ $(tag_changes) == *+* ]] || exec -a gpu-screen-recorder "$REAL" "$@"
+
+sync_tags
+
+socket="${XDG_RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE}/.socket2.sock"
+watch_events() {
+  local event
+  socat -u "UNIX-CONNECT:$socket" - 2>/dev/null | while IFS= read -r event; do
+    case ${event%%>>*} in
+    openwindow | closewindow | movewindow | movewindowv2 | changefloatingmode | fullscreen | workspace | workspacev2 | focusedmon | focusedmonv2)
+      sync_tags
+      ;;
+    esac
+  done
+}
+watch_events &
+watcher=$!
+
+cleanup() {
+  pkill -P "$watcher" 2>/dev/null
+  kill "$watcher" 2>/dev/null
+  sync_tags clear
+}
+trap cleanup EXIT
+
+(exec -a gpu-screen-recorder "$REAL" "$@") &
+wait $!

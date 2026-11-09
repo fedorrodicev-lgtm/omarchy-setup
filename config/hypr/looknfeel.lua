@@ -113,3 +113,7 @@ hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 3, bezier = "smoot
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 2.5, bezier = "smoothOut" })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "smoothInOut", style = "slide" })
 hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4.5, bezier = "smoothOut", style = "slidevert" })
+
+-- A window being screen-recorded on its own drops its rounded corners, so the
+-- video has no wallpaper showing in the corners (see ~/.local/bin/gpu-screen-recorder).
+o.window({ tag = "recording" }, { rounding = 0 })
