@@ -242,6 +242,10 @@ Item {
     root.syncPluginBarApiObjects(pluginBarApis[String(pluginId || "")])
   }
 
+  function isIndicatorsClone(moduleName) {
+    return String(moduleName || "") === "fedor.indicators"
+  }
+
   function pluginBarApiFor(pluginId, moduleName, registered) {
     var key = String(pluginId || "")
     if (!key) return null
@@ -256,6 +260,19 @@ Item {
       // untrusted bar a generic facade factory would let it retrieve another
       // third-party plugin's live service object.
       pluginShell = root.shell.pluginShellForBarEntry(key, moduleName)
+    }
+
+    // That entry facade has no firstPartyServiceFor, so under this replacement
+    // bar the Indicators clone's Night Light / Stay Awake / DND buttons did
+    // nothing. Lend it this bar's own narrow service proxies, same three the
+    // host would give an Indicators clone under the stock bar.
+    if (pluginShell && !pluginShell._firstPartyServiceLookup && root.isIndicatorsClone(moduleName)
+        && root.shell && typeof root.shell.firstPartyServiceFor === "function") {
+      pluginShell._firstPartyServiceLookup = function(requestedId) {
+        var id = String(requestedId || "")
+        if (["omarchy.idle", "omarchy.nightlight", "omarchy.notifications"].indexOf(id) === -1) return null
+        return root.shell.firstPartyServiceFor(id)
+      }
     }
 
     if (pluginBarApis[key]) {
@@ -1661,14 +1678,18 @@ Item {
       Item {
         anchors.fill: parent
 
+        // The island sits under the widgets, whose hover-enabled MouseAreas
+        // take hover from it, so its own handler only sees the padding. The
+        // modules' ancestor handler covers the rest.
+        readonly property bool islandHovered: islandHover.hovered || plainCenterHover.hovered
+        onIslandHoveredChanged: root.setCenterSectionHovered(islandHovered)
+
         CenterGestureArea { anchors.fill: parent }
 
         // One island around whatever the center section currently shows.
         // Only the island itself reveals the indicators, not the empty strip.
         Island {
-          HoverHandler {
-            onHoveredChanged: root.setCenterSectionHovered(hovered)
-          }
+          HoverHandler { id: islandHover }
 
           startX: centerRoot.hasAnchor
             ? (beforeAnchor.width > 0 ? beforeAnchor.x : centerAnchorModule.x)
@@ -1683,7 +1704,35 @@ Item {
           visible: !centerRoot.hasAnchor
           entries: centerRoot.entries
           region: "center"
-          anchors.centerIn: parent
+          anchors.verticalCenter: parent.verticalCenter
+
+          // Centered, but while the pointer is over it the right edge stays put
+          // and the indicators slide out to the left. Plain centering moved the
+          // active Screen Recording icon half the reveal width right, out from
+          // under the pointer, so it could be started but never stopped.
+          property real holdWidth: -1
+          x: (parent.width - width) / 2 - (holdWidth >= 0 ? (width - holdWidth) / 2 : 0)
+
+          // Pins on the island hover itself, which is what starts the reveal.
+          readonly property bool pointerInside: parent.islandHovered
+          onPointerInsideChanged: {
+            if (pointerInside) {
+              plainCenterReleaseTimer.stop()
+              if (holdWidth < 0) holdWidth = width
+            } else {
+              plainCenterReleaseTimer.restart()
+            }
+          }
+
+          HoverHandler { id: plainCenterHover }
+
+          // Collapse right-pinned too (120ms hide delay + 300ms slide in
+          // Indicators.qml), then go back to plain centering.
+          Timer {
+            id: plainCenterReleaseTimer
+            interval: 500
+            onTriggered: plainCenter.holdWidth = -1
+          }
         }
 
         ModuleList {
