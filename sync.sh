@@ -1,6 +1,6 @@
 #!/bin/bash
-# Копирует живые конфиги из ~/.config в репо. Запускай перед коммитом.
-# Список файлов — белый: всё, чего здесь нет, в репо не попадает.
+# Copies live configs from ~/.config into the repo. Run before committing.
+# The lists below are a whitelist: anything not listed stays out of the repo.
 
 set -euo pipefail
 REPO="$(dirname "$(readlink -f "$0")")"
@@ -24,12 +24,12 @@ DIRS=(
   omarchy/plugins/fedor.music
   omarchy/plugins/fedor.network
 )
-# Скрипты из ~/.local/bin — попадают в bin/.
+# Scripts from ~/.local/bin, copied into bin/.
 BINS=(
   screenshot-window-mac
   gpu-screen-recorder
 )
-# Обои Монако-2024 (11–14) без свободной лицензии — только для личного пользования.
+# The Monaco 2024 wallpapers (11–14) aren't freely licensed: personal use only.
 EXCLUDE=(--exclude='*.bak.*' --exclude='backgrounds/1[1-4]-*')
 
 for f in "${FILES[@]}"; do
@@ -43,11 +43,11 @@ for b in "${BINS[@]}"; do
   install -Dm755 "$HOME/.local/bin/$b" "$REPO/bin/$b"
 done
 
-# EXIF/XMP фотографов (имена, почты, адреса, серийники камер) не публикуем —
-# оставляем только цветовой профиль. jpegtran пересобирает без потери качества.
+# Don't publish photographers' EXIF/XMP (names, emails, addresses, camera
+# serials): keep only the color profile. jpegtran rewrites the file losslessly.
 for jpg in "$REPO"/config/omarchy/themes/*/backgrounds/*.jpg; do
   jpegtran -copy icc -optimize -outfile "$jpg.tmp" "$jpg"
   touch -r "$jpg" "$jpg.tmp" && mv "$jpg.tmp" "$jpg"
 done
 
-echo "Синхронизировано. Проверь: git -C '$REPO' status && git -C '$REPO' diff"
+echo "Synced. Review with: git -C '$REPO' status && git -C '$REPO' diff"
