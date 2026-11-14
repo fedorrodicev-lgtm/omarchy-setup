@@ -17,10 +17,33 @@
           "verticalFormat": "HH\n—\nmm"
         },
         {
-          "id": "fedor.music"
+          "id": "omarchy.elsewhen",
+          "cities": [
+            {
+              "name": "Moscow",
+              "zone": "Europe/Moscow"
+            },
+            {
+              "name": "Tokyo",
+              "zone": "Asia/Tokyo"
+            },
+            {
+              "name": "Los Angeles",
+              "zone": "America/Los_Angeles"
+            },
+            {
+              "name": "New York",
+              "zone": "America/New_York"
+            },
+            {
+              "name": "London",
+              "zone": "Europe/London"
+            }
+          ],
+          "offsetMode": "utc"
         },
         {
-          "id": "omarchy.keyboard-layout"
+          "id": "fedor.music"
         },
         {
           "id": "omarchy.weather"
@@ -38,6 +61,9 @@
         }
       ],
       "right": [
+        {
+          "id": "omarchy.keyboard-layout"
+        },
         {
           "id": "fedor.tray"
         },

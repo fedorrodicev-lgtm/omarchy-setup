@@ -117,3 +117,8 @@ hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4.5, bezier = 
 -- A window being screen-recorded on its own drops its rounded corners, so the
 -- video has no wallpaper showing in the corners (see ~/.local/bin/gpu-screen-recorder).
 o.window({ tag = "recording" }, { rounding = 0 })
+
+-- Opt another application in to Omarchy's standard transparency.
+-- Find its class with: hyprctl clients
+-- o.transparent_window("my-app")
+-- o.transparent_window("my-app", "0.9 0.85") -- Custom active/inactive opacity.
