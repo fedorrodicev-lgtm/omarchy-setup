@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ставит сетап поверх Omarchy: копирует config/ в ~/.config и bin/ в ~/.local/bin,
-# заменённые файлы сохраняет в ~/.config/dotfiles-backup-<время>, затем
-# применяет тему.
+# Installs the setup on top of Omarchy: copies config/ into ~/.config and bin/
+# into ~/.local/bin, saves replaced files to ~/.config/dotfiles-backup-<time>,
+# then applies the theme.
 
 set -euo pipefail
 REPO="$(dirname "$(readlink -f "$0")")"
@@ -25,9 +25,9 @@ for b in "$REPO"/bin/*; do
   install -Dm755 "$b" "$dst"
 done
 
-[[ -d $BACKUP ]] && echo "Старые файлы сохранены в $BACKUP"
+[[ -d $BACKUP ]] && echo "Old files saved to $BACKUP"
 
 omarchy theme set ferrari
 omarchy restart shell
 hyprctl reload >/dev/null && hyprctl configerrors
-echo "Готово. Терминалы foot подхватят прозрачность в новых окнах."
+echo "Done. foot terminals pick up the transparency in new windows."
